@@ -30,9 +30,8 @@ class GatedMaskedConv2d(nn.Module):
         self.residual = residual
         self.bh_model = bh_model
 
-        self.class_cond_embedding = nn.Embedding(
-            n_classes, 2 * dim
-        )
+        self.class_cond_embedding = nn.Embedding(n_classes, 2 * dim)
+        self.class_cond_embedding = self.class_cond_embedding.to("cpu")
 
         kernel_shp = (kernel // 2 + 1, 3 if self.bh_model else 1)  # (ceil(n/2), n)
         padding_shp = (kernel // 2, 1 if self.bh_model else 0)
@@ -62,7 +61,9 @@ class GatedMaskedConv2d(nn.Module):
         if self.mask_type == 'A':
             self.make_causal()
 
+        h = h.to(self.class_cond_embedding.weight.device)
         h = self.class_cond_embedding(h)
+
         h_vert = self.vert_stack(x_v)
         h_vert = h_vert[:, :, :x_v.size(-2), :]
         out_v = self.gate(h_vert + h[:, :, None, None])
@@ -126,6 +127,7 @@ class GatedPixelCNN(nn.Module):
         self.apply(weights_init)
 
         self.dp = nn.Dropout(0.1)
+        self.to("cpu")
 
     def forward(self, x, label, aud=None):
         shp = x.size() + (-1,)
